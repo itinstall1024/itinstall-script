@@ -712,10 +712,18 @@ add_docker_repository() {
                 local repo_url="https://download.docker.com/linux/$OS_TYPE"
             fi
             
+            # 25.10 可能尚未在官方仓库发布，回退使用 24.04 (noble)
+            local repo_codename
+            repo_codename=$(lsb_release -cs)
+            if [[ "$OS_TYPE" == "ubuntu" && "$OS_VERSION" == "25.10" ]]; then
+                log_warn "检测到 Ubuntu 25.10，Docker 仓库可能未就绪，回退使用 24.04 (noble) 源"
+                repo_codename="noble"
+            fi
+
             # 添加Docker仓库
             echo \
                 "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] $repo_url \
-                $(lsb_release -cs) stable" | \
+                ${repo_codename} stable" | \
                 tee /etc/apt/sources.list.d/docker.list > /dev/null
             
             log_info "Docker仓库配置文件: /etc/apt/sources.list.d/docker.list"
@@ -791,7 +799,7 @@ install_docker_engine() {
             # 从 apt-cache madison 输出中找匹配版本号的完整版本字符串
             local full_version_string
             full_version_string=$(apt-cache madison docker-ce 2>/dev/null | \
-                grep -m1 "${DOCKER_VERSION}" | awk '{print $3}')
+                grep -m1 "${DOCKER_VERSION}" | awk '{print $3}' || true)
 
             log_info "开始安装Docker..."
             if [[ -n "$full_version_string" ]]; then
